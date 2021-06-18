@@ -1,8 +1,8 @@
 #!/bin/bash
 # This script creates virtual CAN port using slcan
 # You can use it in 2 ways:
-# ./scripts/create_slcan.sh - use automatic device path search
-# ./scripts/create_slcan.sh /dev/ttyACMx - use user device path
+# ./scripts/create_slcan_from_serial.sh - use automatic device path search
+# ./scripts/create_slcan_from_serial.sh /dev/ttyACMx - use user device path
 
 # 1. Set tty settings
 if [ $# == 1 ]

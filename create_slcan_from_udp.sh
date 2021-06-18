@@ -2,7 +2,8 @@
 
 # Config
 COMBINED_UDP_PORT=12346
-
+CUSTOM_DSDL_PATH=/home/nex/catkin_landing_ws/src/inno_drone_station/uavcan_communicator/inno_msgs
+VIRTUAL_SERIAL_PORT_NAME=/dev/serial/by-id/uavcan_udp
 
 function check_processes_related_to_required_port {
     sudo netstat -pna | grep $COMBINED_UDP_PORT
@@ -24,9 +25,9 @@ function concatenate_udp_and_serial_in_background {
     echo $DIR
     $DIR/combine_esp_sockets.py &
     sudo mkdir -p /dev/serial/by-id
-    sudo socat -v -d -d PTY,link=/dev/serial/by-id/uavcan_udp,raw,echo=0,b1000000 UDP4-LISTEN:$COMBINED_UDP_PORT,reuseaddr &
+    sudo socat -v -d -d PTY,link=$VIRTUAL_SERIAL_PORT_NAME,raw,echo=0,b1000000 UDP4-LISTEN:$COMBINED_UDP_PORT,reuseaddr &
     sleep 0.5
-    sudo chmod 777 /dev/serial/by-id/uavcan_udp
+    sudo chmod 777 $VIRTUAL_SERIAL_PORT_NAME
 }
 function close_background_jobs() {
     echo ""
@@ -43,7 +44,8 @@ echo "Starting... Pid of this process is" $$
 trap 'close_background_jobs' SIGINT
 check_processes_related_to_required_port
 concatenate_udp_and_serial_in_background
-uavcan_gui_tool --dsdl /home/nex/catkin_landing_ws/src/inno_drone_station/uavcan_communicator/inno_msgs &
+./create_slcan_from_serial.sh $VIRTUAL_SERIAL_PORT_NAME
+uavcan_gui_tool --dsdl $CUSTOM_DSDL_PATH &
 while true;
 do
     sleep 0.5
