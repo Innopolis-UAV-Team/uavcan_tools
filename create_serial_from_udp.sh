@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Config
-COMBINED_UDP_PORT=12346
-CUSTOM_DSDL_PATH=/home/nex/catkin_landing_ws/src/inno_drone_station/uavcan_communicator/inno_msgs
-VIRTUAL_SERIAL_PORT_NAME=/dev/serial/by-id/uavcan_udp
-
 function check_processes_related_to_required_port {
     sudo netstat -pna | grep $COMBINED_UDP_PORT
     result=$(sudo netstat -pna | grep $COMBINED_UDP_PORT)
@@ -40,6 +35,7 @@ function close_background_jobs() {
 }
 
 
+source config.sh
 echo "Starting... Pid of this process is" $$
 trap 'close_background_jobs' SIGINT
 check_processes_related_to_required_port
