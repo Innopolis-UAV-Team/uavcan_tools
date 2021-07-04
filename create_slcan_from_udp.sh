@@ -14,11 +14,7 @@ function check_processes_related_to_required_port {
     fi
 }
 function concatenate_udp_and_serial_in_background {
-    DIR=$(dirname $(readlink -f $0))
-    echo $DIR
-    echo $DIR
-    echo $DIR
-    $DIR/combine_esp_sockets.py &
+    python3 combine_esp_sockets.py &
     sudo mkdir -p /dev/serial/by-id
     sudo socat -v -d -d PTY,link=$VIRTUAL_SERIAL_PORT_NAME,raw,echo=0,b1000000 UDP4-LISTEN:$COMBINED_UDP_PORT,reuseaddr &
     sleep 0.5
@@ -34,14 +30,14 @@ function close_background_jobs() {
     exit 0
 }
 
-
+cd "$(dirname "$0")"
 source config.sh
 echo "Starting... Pid of this process is" $$
 trap 'close_background_jobs' SIGINT
 check_processes_related_to_required_port
 concatenate_udp_and_serial_in_background
 ./create_slcan_from_serial.sh $VIRTUAL_SERIAL_PORT_NAME
-uavcan_gui_tool --dsdl $CUSTOM_DSDL_PATH &
+[ ! -z "$DISPLAY" ] && uavcan_gui_tool --dsdl $CUSTOM_DSDL_PATH &
 while true;
 do
     sleep 0.5
