@@ -7,6 +7,7 @@ ESP_ADDRESSES = [
     "192.168.43.132"
 ]
 esp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+esp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 esp_sock.bind((socket.gethostname(), ESP_PORT))
 esp_sock.settimeout(0.001)
 
