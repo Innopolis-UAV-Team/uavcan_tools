@@ -11,7 +11,14 @@ ESP_ADDRESSES = [
 
 esp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 esp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-esp_sock.bind((socket.gethostname(), ESP_PORT))
+
+# It is a suitable way to get host IP because socket.gethostname() sometimes return wrong IP
+temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+temp_sock.connect(("8.8.8.8", 80))
+my_ip = temp_sock.getsockname()[0]
+temp_sock.close()
+
+esp_sock.bind((my_ip, ESP_PORT))
 esp_sock.settimeout(0.001)
 esp_rx_counter = 0
 
