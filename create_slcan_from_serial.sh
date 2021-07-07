@@ -52,4 +52,4 @@ slcan_attach $DEV_PATH
 # packet in the case of queue overflow. 
 # More about queueing disciplines:
 # https://rtime.felk.cvut.cz/can/socketcan-qdisc-final.pdf
-sudo tc qdisc add dev slcan0 root handle 1: pfifo_head_drop limit 1000
+sudo tc qdisc add dev slcan0 root handle 1: pfifo_head_drop limit 10
