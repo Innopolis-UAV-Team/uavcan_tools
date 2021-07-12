@@ -16,7 +16,7 @@ function check_processes_related_to_required_port {
 
 }
 function concatenate_udp_and_serial_in_background {
-    python3 combine_esp_sockets.py &
+    python3 combine_esp_sockets.py ${ESP_ADDRESSES[@]} &
     sudo mkdir -p /dev/serial/by-id
     sudo socat PTY,link=$VIRTUAL_SERIAL_PORT_NAME,raw,echo=0,b1000000 UDP4-LISTEN:$COMBINED_UDP_PORT,reuseaddr &
     sleep 0.5
