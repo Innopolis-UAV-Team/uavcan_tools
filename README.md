@@ -29,3 +29,7 @@ Both features in a single script.
 ```bash
 create_slcan_from_udp.sh
 ```
+
+## Installation
+
+sudo apt-get install can-utils

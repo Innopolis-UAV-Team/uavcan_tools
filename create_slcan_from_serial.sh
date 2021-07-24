@@ -28,10 +28,7 @@ then
 fi
 BAUD_RATE=1000000
 
-# 2. Add module to the Linux kernel
-sudo modprobe slcan
-
-# 3. Run daemon slcand from can-utils - link serial interface with a virtual CAN device
+# 2. Run daemon slcand from can-utils - link serial interface with a virtual CAN device
 # It will get name slcan name base
 #   -o              option means open command
 #   -s8             option means 1000 Kbit/s CAN bitrate
