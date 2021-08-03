@@ -33,3 +33,4 @@ create_slcan_from_udp.sh
 ## Installation
 
 sudo apt-get install can-utils socat
+pip3 install netifaces
