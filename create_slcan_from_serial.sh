@@ -4,27 +4,20 @@
 # ./scripts/create_slcan_from_serial.sh - use automatic device path search
 # ./scripts/create_slcan_from_serial.sh /dev/ttyACMx - use user device path
 
+cd "$(dirname "$0")"
+
 # 1. Set tty settings
 if [ $# == 1 ]
 then
     DEV_PATH=$1
 else
-    EXPECTED_VID=0483
-    EXPECTED_PID=374b
-    EXPECTED_DEV_PATH="/dev/ttyACM*"
-    for dev_path in $EXPECTED_DEV_PATH; do
-        check_vid_and_pid=$(udevadm info $dev_path |
-                            grep -E "(ID_MODEL_ID=$EXPECTED_PID|ID_VENDOR_ID=$EXPECTED_VID)" -wc)
-        if [ "$check_vid_and_pid" == 2 ]
-        then
-            DEV_PATH=$dev_path
-        fi
-    done
+    source get_sniffer_symlink.sh
+    DEV_PATH=$DEV_PATH_SYMLINK
 fi
 if [ -z $DEV_PATH ]
 then
     echo "Can't find expected tty device."
-    exit
+    exit 1
 fi
 BAUD_RATE=1000000
 
