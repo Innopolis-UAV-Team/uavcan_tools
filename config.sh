@@ -3,13 +3,13 @@
 # - create_serial_from_udp.sh
 # - create_slcan_from_udp.sh
 # Input environment variables:
-# - UAVCAN_ENVIRONMENT: ["PROD", "MOBILE", "DRONE"]. Empty or otherwise means "PROD".
+# - UAVCAN_ENV: ["PROD", "MOBILE", "DRONE"]. Empty or otherwise means "PROD".
 
-if [ "$UAVCAN_ENVIRONMENT" = "MOBILE" ]; then
+if [ "$UAVCAN_ENV" = "MOBILE" ]; then
     MOBILE_WIFI_IP_FIRST="192.168.43.176"
     MOBILE_WIFI_IP_SECOND="192.168.43.132"
     ESP_ADDRESSES=($MOBILE_WIFI_IP_FIRST $MOBILE_WIFI_IP_SECOND)
-elif [ "$UAVCAN_ENVIRONMENT" = "DRONE" ]; then
+elif [ "$UAVCAN_ENV" = "DRONE" ]; then
     DRONE_WIFI_IP_LANDING_STATION_ESP="192.168.3.140"
     ESP_ADDRESSES=($DRONE_WIFI_IP_LANDING_STATION_ESP)
 else
