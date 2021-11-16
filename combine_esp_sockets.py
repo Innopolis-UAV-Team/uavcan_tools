@@ -4,11 +4,29 @@ import threading
 import datetime
 import sys
 
+
 ESP_PORT = 12345
+UAVCAN_GUI_TOOL_PORT = 12346
 ESP_ADDRESSES_DEFAULT = [
     "192.168.43.176",
     "192.168.43.132"
 ]
+
+LOG_PERIOD_SEC = 1.0
+TIME_BEFORE_START_FIRST_LOG = 2.0
+
+
+class Colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 
 def print_log(log_str):
     print("[{}] SLCAN Traffic Log: {}".format(\
@@ -24,75 +42,140 @@ def get_addresses_from_args():
         esp_addresses = ESP_ADDRESSES_DEFAULT
     return esp_addresses
 
+def get_host_ip():
+    # It is a suitable way to get host IP because socket.gethostname() sometimes return wrong IP
+    temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    temp_sock.connect(("8.8.8.8", 80))
+    my_ip = temp_sock.getsockname()[0]
+    temp_sock.close()
+    return my_ip
 
-esp_addresses = get_addresses_from_args()
-print_log("esp addresses are: " + str(esp_addresses))
 
-esp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-esp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+class Concatenator:
+    def __init__(self):
+        self.esp_addresses = get_addresses_from_args()
+        print_log("esp addresses are: " + str(self.esp_addresses))
 
-# It is a suitable way to get host IP because socket.gethostname() sometimes return wrong IP
-temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-temp_sock.connect(("8.8.8.8", 80))
-my_ip = temp_sock.getsockname()[0]
-temp_sock.close()
-print_log("my ip is: " + my_ip)
+        self.esp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.esp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-esp_sock.bind((my_ip, ESP_PORT))
-esp_sock.settimeout(0.001)
-esp_rx_counter = 0
+        self.my_ip = get_host_ip()
+        print_log("my ip is: " + self.my_ip)
 
-UAVCAN_GUI_TOOL_PORT = 12346
-uavcan_gui_tool_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-uavcan_gui_tool_sock.settimeout(0.001)
-local_rx_counter = 0
+        self.esp_sock.bind((self.my_ip, ESP_PORT))
+        self.esp_sock.settimeout(0.001)
+        self.rx_bytes_counter_from_esp = 0
+        self.rx_counter_from_esp = 0
+        self.rx_timeout_counter_from_esp = 0
+        self.rx_error_counter_from_esp = 0
+        self.tx_timeout_counter_to_gui = 0
+        self.tx_error_counter_to_gui = 0
 
-def print_traffic():
-    global crnt_counter
-    global log_timer, esp_rx_counter, local_rx_counter
-    log_timer = threading.Timer(10.0, print_traffic).start()
+        self.uavcan_gui_tool_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.uavcan_gui_tool_sock.settimeout(0.001)
+        self.rx_bytes_counter_from_gui = 0
+        self.rx_counter_from_gui = 0
+        self.rx_timeout_counter_from_gui = 0
+        self.rx_error_counter_from_gui = 0
+        self.tx_error_counter_to_esp = 0
+        self.tx_timeout_counter_to_esp = 0
 
-    if esp_rx_counter == 0:
-        esp_log_str = "{}esp_rx={}{}".format("\033[93m", esp_rx_counter, '\033[0m')
-    else:
-        esp_log_str = "esp_rx={}".format(esp_rx_counter)
+        self.log_timer = threading.Timer(TIME_BEFORE_START_FIRST_LOG, self._print_traffic).start()
 
-    if local_rx_counter == 0:
-        local_rx_str = "{}local_rx={}{}".format("\033[93m", local_rx_counter, '\033[0m')
-    else:
-        local_rx_str = "local_rx={}".format(local_rx_counter)
+    def __del__(self):
+        self.esp_sock.close()
+        self.uavcan_gui_tool_sock.close()
+        self.log_timer.cancel()
+        print('Interrupted by user, socket has been closed!')
 
-    print_log(esp_log_str + ", " + local_rx_str)
+    def spin(self):
+        self._spin_esp_to_gui_tool()
+        self._spin_gui_tool_to_esp()
 
-    esp_rx_counter = 0
-    local_rx_counter = 0
-
-log_timer = threading.Timer(10.0, print_traffic).start()
-try:
-    while True:
-        # ESP -> uavcan_gui_tool
+    def _spin_esp_to_gui_tool(self):
         try:
-            data, addr = esp_sock.recvfrom(1024)
-            if len(data) != 0:
-                uavcan_gui_tool_sock.sendto(data, ("localhost", UAVCAN_GUI_TOOL_PORT))
-                esp_rx_counter += len(data)
+            data, addr = self.esp_sock.recvfrom(1024)
         except socket.timeout as e:
-            pass
-
-        # uavcan_gui_tool -> ESPs
-        try:
-            data, addr = uavcan_gui_tool_sock.recvfrom(1024)
-            if len(data) != 0:
-                for esp_addr in esp_addresses:
-                    esp_sock.sendto(data, (esp_addr, ESP_PORT))
-                    local_rx_counter += len(data)
-        except socket.timeout as e:
-            pass
+            self.rx_timeout_counter_from_esp += 1
+            return
         except socket.gaierror as e:
-            print(esp_addr, "socket.gaierror", e)
+            self.rx_error_counter_from_esp += 1
+            return
+        if len(data) != 0:
+            try:
+                self.uavcan_gui_tool_sock.sendto(data, ("localhost", UAVCAN_GUI_TOOL_PORT))
+            except socket.timeout as e:
+                pass
+            except socket.gaierror as e:
+                pass
+            self.rx_bytes_counter_from_esp += len(data)
+            self.rx_counter_from_esp += 1
 
-except (KeyboardInterrupt, SystemExit):
-    esp_sock.close()
-    uavcan_gui_tool_sock.close()
-    log_timer.cancel()
-    print('Interrupted by user, socket has been closed!')
+    def _spin_gui_tool_to_esp(self):
+        try:
+            data, addr = self.uavcan_gui_tool_sock.recvfrom(1024)
+        except socket.timeout as e:
+            self.rx_timeout_counter_from_gui += 1
+            return
+        except socket.gaierror as e:
+            self.rx_error_counter_from_gui += 1
+            return
+        if len(data) != 0:
+            for esp_addr in self.esp_addresses:
+                try:
+                    self.esp_sock.sendto(data, (esp_addr, ESP_PORT))
+                except socket.timeout as e:
+                    self.tx_timeout_counter_to_esp += 1
+                except socket.gaierror as e:
+                    self.tx_error_counter_to_esp += 1
+                self.rx_bytes_counter_from_gui += len(data)
+                self.rx_counter_from_gui += 1
+
+    def _print_traffic(self):
+        self.log_timer = threading.Timer(LOG_PERIOD_SEC, self._print_traffic).start()
+
+        if self.rx_bytes_counter_from_esp == 0:
+            esp_log_str = "{}esp_sock rx={}{}".format(Colors.WARNING,
+                                                      self.rx_bytes_counter_from_esp,
+                                                      Colors.ENDC)
+        else:
+            esp_log_str = "esp_sock rx={}/{}".format(self.rx_bytes_counter_from_esp,
+                                                     self.rx_counter_from_esp)
+            if self.rx_error_counter_from_esp is not 0:
+                esp_log_str += "/{}err={}{}".format(Colors.FAIL,
+                                                    self.rx_error_counter_from_esp,
+                                                    Colors.ENDC)
+
+        if self.rx_bytes_counter_from_gui == 0:
+            local_rx_str = "{}gui_sock rx={}{}".format(Colors.WARNING,
+                                                    self.rx_bytes_counter_from_gui,
+                                                    Colors.ENDC)
+        else:
+            local_rx_str = "gui_sock rx={}/{}".format(self.rx_bytes_counter_from_gui,
+                                                      self.rx_counter_from_gui)
+            if self.rx_error_counter_from_gui is not 0:
+                local_rx_str += "/{}err={}{}".format(Colors.FAIL,
+                                                     self.rx_error_counter_from_gui,
+                                                     Colors.ENDC)
+
+        print_log(esp_log_str + ", " + local_rx_str)
+
+        self.rx_bytes_counter_from_esp = 0
+        self.rx_counter_from_esp = 0
+        self.rx_timeout_counter_from_esp = 0
+        self.rx_error_counter_from_esp = 0
+
+        self.rx_bytes_counter_from_gui = 0
+        self.rx_counter_from_gui = 0
+        self.rx_timeout_counter_from_gui = 0
+        self.rx_error_counter_from_gui = 0
+        self.tx_error_counter_to_esp = 0
+
+
+if __name__=="__main__":
+    concatenator = Concatenator()
+    try:
+        while True:
+            concatenator.spin()
+    except (KeyboardInterrupt, SystemExit):
+        del concatenator
