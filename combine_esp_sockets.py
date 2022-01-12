@@ -2,18 +2,14 @@
 import socket
 import threading
 import datetime
-import sys
+import time
 from get_wifi_ip import get_wifi_ip
 
 
 ESP_PORT = 12345
 UAVCAN_GUI_TOOL_PORT = 12346
-ESP_ADDRESSES_DEFAULT = [
-    "192.168.43.176",
-    "192.168.43.132"
-]
 
-LOG_PERIOD_SEC = 1.0
+LOG_PERIOD_SEC = 2.0
 TIME_BEFORE_START_FIRST_LOG = 2.0
 
 
@@ -29,32 +25,39 @@ class Colors:
     UNDERLINE = '\033[4m'
 
 
-def print_log(log_str):
-    print("[{}] SLCAN Traffic Log: {}".format(\
+def log_info(log_str):
+    print("[{}] SLCAN.INFO: {}".format(\
           datetime.datetime.now().strftime("%H:%M:%S"),
           log_str))
 
-def get_addresses_from_args():
-    esp_addresses = []
-    if len(sys.argv) > 1:
-        for address_idx in range(1, len(sys.argv)):
-            esp_addresses.append(sys.argv[address_idx])
-    else:
-        esp_addresses = ESP_ADDRESSES_DEFAULT
-    return esp_addresses
+def log_warn(log_str):
+    print("[{}] {}SLCAN.WARN: {}{}".format(\
+          datetime.datetime.now().strftime("%H:%M:%S"),
+          Colors.WARNING,
+          log_str,
+          Colors.ENDC))
+
+def log_err(log_str):
+    print("[{}] {}SLCAN.ERR: {}{}".format(\
+          datetime.datetime.now().strftime("%H:%M:%S"),
+          Colors.FAIL,
+          log_str,
+          Colors.ENDC))
 
 
 class Concatenator:
     def __init__(self):
-        self.esp_addresses = get_addresses_from_args()
-        print_log("esp addresses are: " + str(self.esp_addresses))
+        self.addresses = dict()
+
+        self.my_ip = get_wifi_ip()
+        ip_info_str = "Host IP is {}".format(self.my_ip)
+        if self.my_ip == "127.0.0.1":
+            log_err(ip_info_str)
+        else:
+            log_info(ip_info_str)
 
         self.esp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.esp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-        self.my_ip = get_wifi_ip()
-        print_log("my ip is: " + self.my_ip)
-
         self.esp_sock.bind((self.my_ip, ESP_PORT))
         self.esp_sock.settimeout(0.001)
         self.rx_bytes_counter_from_esp = 0
@@ -79,22 +82,28 @@ class Concatenator:
         self.esp_sock.close()
         self.uavcan_gui_tool_sock.close()
         self.log_timer.cancel()
-        print('Interrupted by user, socket has been closed!')
+        log_err('Interrupted by user, socket has been closed!')
 
     def spin(self):
         self._spin_esp_to_gui_tool()
         self._spin_gui_tool_to_esp()
 
     def _spin_esp_to_gui_tool(self):
+        # recv from the network:
+        data = None
         try:
             data, addr = self.esp_sock.recvfrom(1024)
+            self._update_esp_addresses_timestampts(addr)
         except socket.timeout as e:
             self.rx_timeout_counter_from_esp += 1
-            return
         except socket.gaierror as e:
+            print(e)
             self.rx_error_counter_from_esp += 1
             return
-        if len(data) != 0:
+        self._remove_unused_esp_addresses()
+
+        # send to the local application:
+        if data is not None and len(data) != 0:
             try:
                 self.uavcan_gui_tool_sock.sendto(data, ("localhost", UAVCAN_GUI_TOOL_PORT))
             except socket.timeout as e:
@@ -114,7 +123,7 @@ class Concatenator:
             self.rx_error_counter_from_gui += 1
             return
         if len(data) != 0:
-            for esp_addr in self.esp_addresses:
+            for esp_addr in self.addresses:
                 try:
                     self.esp_sock.sendto(data, (esp_addr, ESP_PORT))
                 except socket.timeout as e:
@@ -123,6 +132,22 @@ class Concatenator:
                     self.tx_error_counter_to_esp += 1
                 self.rx_bytes_counter_from_gui += len(data)
                 self.rx_counter_from_gui += 1
+
+    def _update_esp_addresses_timestampts(self, addr):
+        if addr[0] not in self.addresses.keys():
+            log_warn("New address ({}) has been added to the existed set: {}".format(addr[0], self.addresses))
+        self.addresses[addr[0]] = time.time()
+
+    def _remove_unused_esp_addresses(self):
+        MAX_DELAY_SEC = 5.0
+        crnt_time = time.time()
+        for addr in self.addresses:
+            last_recv_time_sec = self.addresses[addr]
+            if last_recv_time_sec + MAX_DELAY_SEC < crnt_time:
+                log_warn("{} has been inactive for last {} seconds.".format(addr, MAX_DELAY_SEC))
+                del self.addresses[addr]
+                log_warn("New set of addresses is {}.".format(self.addresses))
+                break
 
     def _print_traffic(self):
         self.log_timer = threading.Timer(LOG_PERIOD_SEC, self._print_traffic).start()
@@ -141,8 +166,8 @@ class Concatenator:
 
         if self.rx_bytes_counter_from_gui == 0:
             local_rx_str = "{}gui_sock rx={}{}".format(Colors.WARNING,
-                                                    self.rx_bytes_counter_from_gui,
-                                                    Colors.ENDC)
+                                                       self.rx_bytes_counter_from_gui,
+                                                       Colors.ENDC)
         else:
             local_rx_str = "gui_sock rx={}/{}".format(self.rx_bytes_counter_from_gui,
                                                       self.rx_counter_from_gui)
@@ -151,7 +176,7 @@ class Concatenator:
                                                      self.rx_error_counter_from_gui,
                                                      Colors.ENDC)
 
-        print_log(esp_log_str + ", " + local_rx_str)
+        log_info(esp_log_str + ", " + local_rx_str)
 
         self.rx_bytes_counter_from_esp = 0
         self.rx_counter_from_esp = 0
