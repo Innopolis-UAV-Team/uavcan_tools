@@ -32,4 +32,7 @@ create_slcan_from_udp.sh
 
 ## Installation
 
-sudo apt-get install can-utils
+```bash
+sudo apt-get install -y can-utils socat net-tools
+pip3 install netifaces
+```
