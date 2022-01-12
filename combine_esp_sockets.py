@@ -3,6 +3,7 @@ import socket
 import threading
 import datetime
 import sys
+from get_wifi_ip import get_wifi_ip
 
 ESP_PORT = 12345
 ESP_ADDRESSES_DEFAULT = [
@@ -32,11 +33,13 @@ esp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 esp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 # It is a suitable way to get host IP because socket.gethostname() sometimes return wrong IP
-temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-temp_sock.connect(("8.8.8.8", 80))
-my_ip = temp_sock.getsockname()[0]
-temp_sock.close()
-print_log("my ip is: " + my_ip)
+my_ip = get_wifi_ip()
+if my_ip == "127.0.0.1":
+    warning_string = "{}WARNING. Suspicious IP={}{}".format("\033[93m", my_ip, '\033[0m')
+    print_log(warning_string)
+else:
+    info_string = "INFO. My ip is={}".format(my_ip)
+    print_log(info_string)
 
 esp_sock.bind((my_ip, ESP_PORT))
 esp_sock.settimeout(0.001)
