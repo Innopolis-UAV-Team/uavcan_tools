@@ -4,6 +4,7 @@ import threading
 import datetime
 import time
 from get_wifi_ip import get_wifi_ip
+from slcan_parser import parse_data
 
 
 ESP_PORT = 12345
@@ -26,28 +27,32 @@ class Colors:
 
 
 def log_info(log_str):
-    print("[{}] SLCAN.INFO: {}".format(\
+    print("[{}] UDP.INFO: {}".format(\
           datetime.datetime.now().strftime("%H:%M:%S"),
           log_str))
 
 def log_warn(log_str):
-    print("[{}] {}SLCAN.WARN: {}{}".format(\
+    print("[{}] {}UDP.WARN: {}{}".format(\
           datetime.datetime.now().strftime("%H:%M:%S"),
           Colors.WARNING,
           log_str,
           Colors.ENDC))
 
 def log_err(log_str):
-    print("[{}] {}SLCAN.ERR: {}{}".format(\
+    print("[{}] {}UDP.ERR: {}{}".format(\
           datetime.datetime.now().strftime("%H:%M:%S"),
           Colors.FAIL,
           log_str,
           Colors.ENDC))
 
+class NodeInfo:
+    def __init__(self, time, buffer="kek") -> None:
+        self.time = time
+        self.buffer = buffer
 
 class Concatenator:
     def __init__(self):
-        self.addresses = dict()
+        self.nodes_online = dict()
 
         self.my_ip = get_wifi_ip()
         ip_info_str = "Host IP is {}".format(self.my_ip)
@@ -94,6 +99,7 @@ class Concatenator:
         try:
             data, addr = self.esp_sock.recvfrom(1024)
             self._update_esp_addresses_timestampts(addr)
+            data = self._parse_received_data(data, addr)
         except socket.timeout as e:
             self.rx_timeout_counter_from_esp += 1
         except socket.gaierror as e:
@@ -123,7 +129,7 @@ class Concatenator:
             self.rx_error_counter_from_gui += 1
             return
         if len(data) != 0:
-            for esp_addr in self.addresses:
+            for esp_addr in self.nodes_online:
                 try:
                     self.esp_sock.sendto(data, (esp_addr, ESP_PORT))
                 except socket.timeout as e:
@@ -133,20 +139,40 @@ class Concatenator:
                 self.rx_bytes_counter_from_gui += len(data)
                 self.rx_counter_from_gui += 1
 
+    def _parse_received_data(self, new_coming_bytes, addr):
+        """
+        Based on previously stored and new coming bytes, return parsed frame and skip broken.
+        """
+        new_coming_bytes = new_coming_bytes.decode("utf-8")
+
+        storage_buffer = self.nodes_online[addr[0]].buffer
+        parsed_frames, storage_buffer = parse_data(storage_buffer, new_coming_bytes)
+        # print("\ncase:", len(new_coming_bytes), addr[0])
+        # print("- stored: {} {}".format(len(self.nodes_online[addr[0]].buffer), self.nodes_online[addr[0]].buffer.encode()))
+        # print("- coming: {} {}".format(len(new_coming_bytes), new_coming_bytes.encode()))
+        # print("- parsed: {} {}".format(len(parsed_frames), parsed_frames.encode()))
+        # print("- stored: {} {}".format(len(storage_buffer), storage_buffer.encode()))
+        self.nodes_online[addr[0]].buffer = storage_buffer
+
+        return parsed_frames.encode()
+
     def _update_esp_addresses_timestampts(self, addr):
-        if addr[0] not in self.addresses.keys():
-            log_warn("New address ({}) has been added to the existed set: {}".format(addr[0], self.addresses))
-        self.addresses[addr[0]] = time.time()
+        if addr[0] not in self.nodes_online.keys():
+            log_warn("New node ({}) has been added to the existed set: {}".format(addr[0], self.nodes_online.keys()))
+        if addr[0] in self.nodes_online:
+            self.nodes_online[addr[0]].time = time.time()
+        else:
+            self.nodes_online[addr[0]] = NodeInfo(time=time.time())
 
     def _remove_unused_esp_addresses(self):
         MAX_DELAY_SEC = 5.0
         crnt_time = time.time()
-        for addr in self.addresses:
-            last_recv_time_sec = self.addresses[addr]
+        for addr in self.nodes_online:
+            last_recv_time_sec = self.nodes_online[addr].time
             if last_recv_time_sec + MAX_DELAY_SEC < crnt_time:
                 log_warn("{} has been inactive for last {} seconds.".format(addr, MAX_DELAY_SEC))
-                del self.addresses[addr]
-                log_warn("New set of addresses is {}.".format(self.addresses))
+                del self.nodes_online[addr[0]]
+                log_warn("New set of nodes is {}.".format(self.nodes_online))
                 break
 
     def _print_traffic(self):
