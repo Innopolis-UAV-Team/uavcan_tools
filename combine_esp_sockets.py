@@ -171,7 +171,7 @@ class Concatenator:
             last_recv_time_sec = self.nodes_online[addr].time
             if last_recv_time_sec + MAX_DELAY_SEC < crnt_time:
                 log_warn("{} has been inactive for last {} seconds.".format(addr, MAX_DELAY_SEC))
-                del self.nodes_online[addr[0]]
+                del self.nodes_online[addr]
                 log_warn("New set of nodes is {}.".format(self.nodes_online))
                 break
 
