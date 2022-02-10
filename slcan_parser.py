@@ -30,6 +30,11 @@ def parse_data(storage, new_coming_bytes):
         last_parsed_tail_idx = 0
         while head_idx <= combined_buffer_size - FRAME_MIN_LENGTH:
             if data[head_idx] == FRAME_FIRST_BYTE:
+                try:
+                    payload_size = int(data[head_idx + FRAME_SIZE_IDX])
+                except ValueError:
+                    head_idx += 1
+                    continue
                 frame_size = FRAME_MIN_LENGTH + 2 * int(data[head_idx + FRAME_SIZE_IDX])
                 if frame_size < combined_buffer_size - head_idx + 1 and data[head_idx + frame_size - 1] == FRAME_LAST_BYTE:
                     parsed_frames += data[head_idx : head_idx + frame_size]

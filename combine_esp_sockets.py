@@ -143,8 +143,11 @@ class Concatenator:
         """
         Based on previously stored and new coming bytes, return parsed frame and skip broken.
         """
-        new_coming_bytes = new_coming_bytes.decode("utf-8")
-
+        try:
+            new_coming_bytes = new_coming_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            log_err("UnicodeDecodeError")
+            return []
         storage_buffer = self.nodes_online[addr[0]].buffer
         parsed_frames, storage_buffer = parse_data(storage_buffer, new_coming_bytes)
         # print("\ncase:", len(new_coming_bytes), addr[0])
