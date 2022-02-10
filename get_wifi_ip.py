@@ -15,7 +15,7 @@ def get_wifi_ip():
 
     for iface in ifaces:
         try:
-            if iface[0:2] == "wl":
+            if iface[0:2] == "wl" or iface[0:3] == "eth":
                 wifi_iface_name = iface
                 wifi_ip = ifaddresses(wifi_iface_name)[AF_INET][0]['addr']
                 break
@@ -23,3 +23,6 @@ def get_wifi_ip():
             pass
 
     return wifi_ip
+
+if __name__=="__main__":
+    print(get_wifi_ip())
