@@ -7,15 +7,23 @@
 cd "$(dirname "$0")"
 
 # 1. Set tty settings
-if [ $# == 1 ]
-then
+echo "SLCAN creating settings:"
+if [ $# -ge 1 ]; then
     DEV_PATH=$1
+    echo "- DEV_PATH:" $DEV_PATH "(user specified)"
 else
     source get_sniffer_symlink.sh
     DEV_PATH=$DEV_PATH_SYMLINK
+    echo "- DEV_PATH:" $DEV_PATH "(auto)"
 fi
-if [ -z $DEV_PATH ]
-then
+if [ $# -ge 2 ]; then
+    INTERFACE_NAME=$2
+    echo "- INTERFACE_NAME:" $INTERFACE_NAME "(user specified)"
+else
+    INTERFACE_NAME=slcan0
+    echo "- INTERFACE_NAME:" $INTERFACE_NAME "(auto)"
+fi
+if [ -z $DEV_PATH ]; then
     echo "Can't find expected tty device."
     exit 1
 fi
@@ -31,9 +39,7 @@ BAUD_RATE=1000000
 # sudo slcand -o -s8 -t hw -S $BAUD_RATE $DEV_PATH
 sudo slcand -o -c -f -s8 -t hw -S $BAUD_RATE $DEV_PATH
 
-
-sudo ip link set up slcan0
-slcan_attach $DEV_PATH
+sudo ip link set up $INTERFACE_NAME
 
 # Setup SocketCAN queue discipline type
 # By default it uses pfifo_fast with queue size 10.
@@ -42,4 +48,4 @@ slcan_attach $DEV_PATH
 # packet in the case of queue overflow. 
 # More about queueing disciplines:
 # https://rtime.felk.cvut.cz/can/socketcan-qdisc-final.pdf
-sudo tc qdisc add dev slcan0 root handle 1: pfifo_head_drop limit 1000
+sudo tc qdisc add dev $INTERFACE_NAME root handle 1: pfifo_head_drop limit 1000
