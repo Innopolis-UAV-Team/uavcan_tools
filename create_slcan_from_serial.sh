@@ -4,10 +4,8 @@
 # ./scripts/create_slcan_from_serial.sh - use automatic device path search
 # ./scripts/create_slcan_from_serial.sh /dev/ttyACMx - use user device path
 
-cd "$(dirname "$0")"
-
 # 1. Set tty settings
-echo "SLCAN creating settings:"
+echo "SLCAN creator settings:"
 if [ $# -ge 1 ]; then
     DEV_PATH=$1
     echo "- DEV_PATH:" $DEV_PATH "(user specified)"
@@ -27,7 +25,14 @@ if [ -z $DEV_PATH ]; then
     echo "Can't find expected tty device."
     exit 1
 fi
-BAUD_RATE=1000000
+if [ ! -c "$DEV_PATH" ]; then
+    echo "SLCAN creator ERROR: specified character device path is not exist."
+    exit 1
+fi
+if [[ $(ifconfig | grep $INTERFACE_NAME) ]]; then
+    echo "SLCAN creator: specified interface already exist, skip."
+    exit 1
+fi
 
 # 2. Run daemon slcand from can-utils - link serial interface with a virtual CAN device
 # It will get name slcan name base
@@ -37,7 +42,7 @@ BAUD_RATE=1000000
 #   -S $BAUD_RATE   option means uart baud rate
 #   $DEV_PATH       position argument means port name
 # sudo slcand -o -s8 -t hw -S $BAUD_RATE $DEV_PATH
-sudo slcand -o -c -f -s8 -t hw -S $BAUD_RATE $DEV_PATH
+sudo slcand -o -c -f -s8 -t hw -S 1000000 $DEV_PATH
 
 sudo ip link set up $INTERFACE_NAME
 
