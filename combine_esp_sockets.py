@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 import socket
 import threading
 import datetime
@@ -30,6 +31,7 @@ def log_info(log_str):
     print("[{}] UDP.INFO: {}".format(\
           datetime.datetime.now().strftime("%H:%M:%S"),
           log_str))
+    sys.stdout.flush()
 
 def log_warn(log_str):
     print("[{}] {}UDP.WARN: {}{}".format(\
@@ -37,6 +39,7 @@ def log_warn(log_str):
           Colors.WARNING,
           log_str,
           Colors.ENDC))
+    sys.stdout.flush()
 
 def log_err(log_str):
     print("[{}] {}UDP.ERR: {}{}".format(\
@@ -44,6 +47,7 @@ def log_err(log_str):
           Colors.FAIL,
           log_str,
           Colors.ENDC))
+    sys.stdout.flush()
 
 class NodeInfo:
     def __init__(self, time, buffer="kek") -> None:
@@ -188,7 +192,7 @@ class Concatenator:
         else:
             esp_log_str = "esp_sock rx={}/{}".format(self.rx_bytes_counter_from_esp,
                                                      self.rx_counter_from_esp)
-            if self.rx_error_counter_from_esp is not 0:
+            if self.rx_error_counter_from_esp != 0:
                 esp_log_str += "/{}err={}{}".format(Colors.FAIL,
                                                     self.rx_error_counter_from_esp,
                                                     Colors.ENDC)
@@ -200,7 +204,7 @@ class Concatenator:
         else:
             local_rx_str = "gui_sock rx={}/{}".format(self.rx_bytes_counter_from_gui,
                                                       self.rx_counter_from_gui)
-            if self.rx_error_counter_from_gui is not 0:
+            if self.rx_error_counter_from_gui != 0:
                 local_rx_str += "/{}err={}{}".format(Colors.FAIL,
                                                      self.rx_error_counter_from_gui,
                                                      Colors.ENDC)
