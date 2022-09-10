@@ -65,10 +65,10 @@ class Concatenator:
         else:
             log_info(ip_info_str)
 
-        self.esp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.esp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.esp_sock.bind((self.my_ip, ESP_PORT))
+        self.esp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.esp_sock.bind(("", 12345))
         self.esp_sock.settimeout(0.001)
+        self.esp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.rx_bytes_counter_from_esp = 0
         self.rx_counter_from_esp = 0
         self.rx_timeout_counter_from_esp = 0
