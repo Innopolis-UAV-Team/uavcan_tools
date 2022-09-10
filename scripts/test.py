@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-import os
-import sys
 import unittest
 from slcan_parser import parse_data
 
-class TestFrontSquatsDetector(unittest.TestCase):
+class TestSlcanParser(unittest.TestCase):
     def test_01_part_of_frame(self):
         stored_bytes = "T"
         new_coming_bytes = "9"
