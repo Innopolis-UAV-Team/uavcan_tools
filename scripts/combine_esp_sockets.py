@@ -1,53 +1,16 @@
 #!/usr/bin/env python3
-import sys
 import socket
 import threading
-import datetime
 import time
 from get_wifi_ip import get_wifi_ip
 from slcan_parser import parse_data
-
+from color_logging import Colors, log_info, log_warn, log_err
 
 ESP_PORT = 12345
 UAVCAN_GUI_TOOL_PORT = 12346
 
-LOG_PERIOD_SEC = 2.0
+LOG_PERIOD_SEC = 10.0
 TIME_BEFORE_START_FIRST_LOG = 2.0
-
-
-class Colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-
-def log_info(log_str):
-    print("[{}] UDP.INFO: {}".format(\
-          datetime.datetime.now().strftime("%H:%M:%S"),
-          log_str))
-    sys.stdout.flush()
-
-def log_warn(log_str):
-    print("[{}] {}UDP.WARN: {}{}".format(\
-          datetime.datetime.now().strftime("%H:%M:%S"),
-          Colors.WARNING,
-          log_str,
-          Colors.ENDC))
-    sys.stdout.flush()
-
-def log_err(log_str):
-    print("[{}] {}UDP.ERR: {}{}".format(\
-          datetime.datetime.now().strftime("%H:%M:%S"),
-          Colors.FAIL,
-          log_str,
-          Colors.ENDC))
-    sys.stdout.flush()
 
 class NodeInfo:
     def __init__(self, time, buffer="kek") -> None:
@@ -186,16 +149,11 @@ class Concatenator:
         self.log_timer = threading.Timer(LOG_PERIOD_SEC, self._print_traffic).start()
 
         if self.rx_bytes_counter_from_esp == 0:
-            esp_log_str = "{}esp_sock rx={}{}".format(Colors.WARNING,
-                                                      self.rx_bytes_counter_from_esp,
-                                                      Colors.ENDC)
+            esp_log_str = f"{Colors.WARNING}esp_sock rx={self.rx_bytes_counter_from_esp}{Colors.ENDC}"
         else:
-            esp_log_str = "esp_sock rx={}/{}".format(self.rx_bytes_counter_from_esp,
-                                                     self.rx_counter_from_esp)
+            esp_log_str = f"esp_sock rx={self.rx_bytes_counter_from_esp}/{self.rx_counter_from_esp}"
             if self.rx_error_counter_from_esp != 0:
-                esp_log_str += "/{}err={}{}".format(Colors.FAIL,
-                                                    self.rx_error_counter_from_esp,
-                                                    Colors.ENDC)
+                esp_log_str += f"/{Colors.FAIL}err={self.rx_error_counter_from_esp}{Colors.ENDC}"
 
         if self.rx_bytes_counter_from_gui == 0:
             local_rx_str = "{}gui_sock rx={}{}".format(Colors.WARNING,
